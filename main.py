@@ -1,7 +1,8 @@
 """
 HH Goa 2026 Shortlisting Task 3 - Main End-to-End Pipeline Entry Point.
 
-Milestone 5: Complete Integrated Pipeline.
+Milestone 5 & 6 Integrated Terminal Experience.
+Supports both non-interactive CLI arguments (--image, --top) and an interactive CLI mode.
 
 Orchestrates:
   1. Input Image Validation & Face Detection (face_processor.py)
@@ -17,7 +18,6 @@ import os
 import sys
 import json
 import argparse
-from datetime import datetime
 
 # Import modular project components
 import face_processor
@@ -42,42 +42,47 @@ def run_pipeline(image_path: str, top_n: int = 10) -> dict:
     Returns:
         dict: Complete structured result dictionary.
     """
-    # ---------------------------------------------------------
-    # STEP 1: Input Image Validation & Face Processing
-    # ---------------------------------------------------------
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"Input image file not found: '{image_path}'")
+    # Clean input path (strip surrounding quotes and whitespace)
+    clean_path = image_path.strip().strip('"').strip("'")
+    if not os.path.exists(clean_path):
+        raise FileNotFoundError(f"Input image file not found: '{clean_path}'")
 
     print("\n============================================================")
-    print("  HH GOA 2026 - FACE VERIFICATION & BLOCKCHAIN PIPELINE   ")
+    print("HH Goa 2026 — Face Identification & Blockchain Verification")
     print("============================================================")
-    print(f"\n[*] STEP 1: Validating input image and detecting faces...")
-    print(f"    - Input Image: {image_path}")
+
+    # ---------------------------------------------------------
+    # SECTION 1: INPUT FACE
+    # ---------------------------------------------------------
+    print("\n[1/4] INPUT FACE")
+    print("-" * 60)
+    print(f"Image:\n{clean_path}")
 
     try:
-        faces = face_processor.extract_face(image_path, enforce_detection=True)
+        faces = face_processor.extract_face(clean_path, enforce_detection=True)
         if not faces or len(faces) == 0:
             raise ValueError("No detectable face found in input image.")
-        print(f"    [+] Face Detection: SUCCESS ({len(faces)} face(s) detected)")
+        print(f"\nFaces detected:\n{len(faces)}")
     except Exception as err:
         raise ValueError(f"No detectable face found in input image. Details: {err}")
 
     # ---------------------------------------------------------
-    # STEP 2: Google Lens Reverse Image Search
+    # SECTION 2: GOOGLE LENS REVERSE SEARCH
     # ---------------------------------------------------------
-    print(f"\n[*] STEP 2: Executing Google Lens reverse image search (SerpApi)...")
+    print("\n[2/4] GOOGLE LENS REVERSE SEARCH")
+    print("-" * 60)
     try:
-        lens_candidates, raw_lens_response = perform_reverse_image_search(image_path, save_raw=True)
+        lens_candidates, raw_lens_response = perform_reverse_image_search(clean_path, save_raw=True)
         lens_count = len(lens_candidates)
-        print(f"    [+] Google Lens Search: CONNECTED")
-        print(f"    [+] Visual Matches Returned: {lens_count}")
+        print("✓ Search completed")
+        print(f"✓ Visual matches found: {lens_count}")
     except Exception as err:
         raise RuntimeError(f"Google Lens search failed: {err}")
 
     if lens_count == 0:
-        print("    [-] No candidate visual matches returned by Google Lens for this image.")
+        print("\n[-] No candidate visual matches returned by Google Lens for this image.")
         return {
-            "input_image": image_path,
+            "input_image": clean_path,
             "lens_candidates_found": 0,
             "candidates_processed": 0,
             "best_match": None,
@@ -86,26 +91,47 @@ def run_pipeline(image_path: str, top_n: int = 10) -> dict:
         }
 
     # ---------------------------------------------------------
-    # STEP 3: Candidate Download & ArcFace Verification
+    # SECTION 3: ARCFACE FACE MATCH VERIFICATION
     # ---------------------------------------------------------
-    print(f"\n[*] STEP 3: Downloading top {top_n} candidates & running ArcFace verification...")
+    print("\n[3/4] ARCFACE FACE MATCH VERIFICATION")
+    print("-" * 60)
     summary = process_and_verify_candidates(
-        original_image_path=image_path,
+        original_image_path=clean_path,
         candidates=lens_candidates,
         max_candidates=top_n
     )
 
+    ranked = summary.get("ranked_candidates", [])
+    verified_candidates = [c for c in ranked if c.get("verified")]
+
+    print("\nMATCHED WEB RESULTS")
+    print("-" * 60)
+
+    # Display up to 5 top verified matches
+    top_display_matches = verified_candidates[:5]
+    if top_display_matches:
+        for idx, match in enumerate(top_display_matches, 1):
+            dist_val = f"{match['best_distance']:.4f}" if match.get("best_distance") is not None else "N/A"
+            print(f"[{idx}] ✓ FACE MATCH")
+            print(f"Source: {match.get('source', 'N/A')}")
+            print(f"Title: {match.get('title', 'N/A')}")
+            print(f"URL: {match.get('page_url', 'N/A')}")
+            print(f"ArcFace Distance: {dist_val}\n")
+    else:
+        print("[-] No verified face matches found among processed candidates.\n")
+
+    print("-" * 60)
+    print(f"Candidates analyzed: {summary['processed_candidates_count']}")
+    print(f"Face Matches Verified (ArcFace): {summary['verified_matches_count']}")
+
     best_match = summary.get("best_candidate")
 
-    # ---------------------------------------------------------
-    # STEP 4: Best Match Selection & Safeguard Check
-    # ---------------------------------------------------------
     if not best_match or not best_match.get("verified"):
         print("\n[-] RESULT: NO VERIFIED FACE MATCH FOUND.")
         print("    (Unverified candidates will NOT be recorded on blockchain.)")
-        
+
         result_payload = {
-            "input_image": image_path,
+            "input_image": clean_path,
             "lens_candidates_found": lens_count,
             "candidates_processed": summary["processed_candidates_count"],
             "candidate_images_downloaded": summary["download_success_count"],
@@ -115,23 +141,27 @@ def run_pipeline(image_path: str, top_n: int = 10) -> dict:
             "blockchain": None,
             "status": "NO_VERIFIED_MATCH"
         }
-        
+
         with open("final_result.json", "w", encoding="utf-8") as f:
             json.dump(result_payload, f, indent=2)
         return result_payload
 
-    print("\n[+] VERIFIED BEST MATCH FOUND:")
-    print(f"    - Title         : {best_match['title']}")
-    print(f"    - Source Domain : {best_match['source']}")
-    print(f"    - Page URL      : {best_match['page_url']}")
-    print(f"    - Image URL     : {best_match['image_url']}")
-    print(f"    - ArcFace Dist  : {best_match['best_distance']:.4f} (Threshold: {best_match['threshold']:.4f})")
-    print(f"    - Match Status  : ✓ FACE MATCH VERIFIED")
+    print("\nBEST FACE MATCH")
+    print("-" * 60)
+    print(f"Title: {best_match['title']}")
+    print(f"Source: {best_match['source']}")
+    print(f"Page URL: {best_match['page_url']}")
+    print(f"Image URL: {best_match['image_url']}")
+    print(f"ArcFace Distance: {best_match['best_distance']:.4f}")
+    print(f"Threshold: {best_match['threshold']:.4f}")
+    print("-" * 60)
 
     # ---------------------------------------------------------
-    # STEP 5: Canonical Record & SHA-256 Fingerprint
+    # SECTION 4: ETHEREUM SEPOLIA BLOCKCHAIN
     # ---------------------------------------------------------
-    print(f"\n[*] STEP 5: Generating canonical record & SHA-256 fingerprint...")
+    print("\n[4/4] ETHEREUM SEPOLIA BLOCKCHAIN")
+    print("-" * 60)
+
     canonical_record = {
         "title": best_match["title"],
         "source": best_match["source"],
@@ -142,54 +172,56 @@ def run_pipeline(image_path: str, top_n: int = 10) -> dict:
     }
 
     fp = create_fingerprint(canonical_record)
-    print(f"    - Canonical Record : {fp['canonical_json']}")
-    print(f"    - SHA-256 Fingerprint : {fp['hex_hash']}")
 
-    # ---------------------------------------------------------
-    # STEP 6: Blockchain Storage & On-Chain Re-Verification
-    # ---------------------------------------------------------
-    print(f"\n[*] STEP 6: Connecting to local blockchain & recording fingerprint...")
     try:
         blockchain_client = BlockchainClient()
-        print(f"    [+] Blockchain: CONNECTED ({blockchain_client.rpc_url})")
-        print(f"    [+] Contract Address: {blockchain_client.contract_address}")
 
         # Store fingerprint on-chain
         tx_receipt = blockchain_client.store_record(fp["bytes32_hex"], canonical_record["source_url"])
-        print(f"    [+] Transaction Hash : {tx_receipt['transaction_hash']}")
-        print(f"    [+] Block Number     : {tx_receipt['block_number']}")
-        print(f"    [+] Gas Used         : {tx_receipt['gas_used']}")
 
         # Re-verify on-chain state
         is_verified_on_chain = blockchain_client.verify_record(fp["bytes32_hex"])
-        print(f"    [+] On-Chain Verification Status: {is_verified_on_chain}")
 
         if not is_verified_on_chain:
             raise RuntimeError("On-chain fingerprint re-verification failed!")
 
-        print("    [+] FINGERPRINT VERIFIED ON BLOCKCHAIN")
+        print("Canonical Evidence Fingerprint")
+        print(f"SHA-256:\n{fp['hex_hash']}")
+        print(f"\nNetwork:\n{blockchain_client.network_name}")
+        print(f"\nContract:\n{blockchain_client.contract_address}")
+        print(f"\nTransaction:\n{tx_receipt['transaction_hash']}")
+        print(f"\nBlock:\n{tx_receipt['block_number']}")
+        print("\n✓ FINGERPRINT STORED ON BLOCKCHAIN")
+        print("✓ ON-CHAIN VERIFICATION: TRUE")
+
+        etherscan_url = tx_receipt.get("etherscan_tx_url", "N/A")
+        print(f"\nETHERSCAN\n{etherscan_url}")
 
         blockchain_info = {
             "sha256": fp["hex_hash"],
             "bytes32_hex": fp["bytes32_hex"],
+            "network_name": blockchain_client.network_name,
+            "chain_id": blockchain_client.chain_id,
             "contract_address": blockchain_client.contract_address,
             "transaction_hash": tx_receipt["transaction_hash"],
             "block_number": tx_receipt["block_number"],
+            "etherscan_tx_url": etherscan_url,
+            "etherscan_contract_url": tx_receipt.get("etherscan_contract_url"),
             "verified": is_verified_on_chain
         }
 
     except Exception as err:
         raise ConnectionError(
-            f"Could not connect to local blockchain at configured RPC endpoint.\n"
-            f"Please start Ganache on http://127.0.0.1:8545, deploy contract via 'python blockchain/deploy_local.py', and try again.\n"
+            f"Could not connect to blockchain at configured RPC endpoint.\n"
+            f"Please verify your SEPOLIA_RPC_URL in .env or deploy local contract.\n"
             f"Error details: {err}"
         )
 
     # ---------------------------------------------------------
-    # STEP 7: Save Structured Result & Generate Final Report
+    # FINAL SUMMARY
     # ---------------------------------------------------------
     final_payload = {
-        "input_image": image_path,
+        "input_image": clean_path,
         "lens_candidates_found": lens_count,
         "candidates_processed": summary["processed_candidates_count"],
         "candidate_images_downloaded": summary["download_success_count"],
@@ -210,64 +242,21 @@ def run_pipeline(image_path: str, top_n: int = 10) -> dict:
     with open("final_result.json", "w", encoding="utf-8") as f:
         json.dump(final_payload, f, indent=2)
 
-    print_cli_report(final_payload)
-    return final_payload
-
-
-def print_cli_report(data: dict):
-    """
-    Renders clean, human-readable terminal report.
-    """
-    best = data.get("best_match", {})
-    bc = data.get("blockchain", {})
-
     print("\n" + "=" * 60)
-    print("HH GOA 2026 — FACE VERIFICATION & BLOCKCHAIN PIPELINE")
+    print("VERIFICATION COMPLETE")
     print("=" * 60)
-
-    print("\nINPUT")
-    print("-" * 60)
-    print(f"Image:\n{data['input_image']}")
-    print("\nFace Detection:\n✓ Face detected")
-
-    print("\nREVERSE IMAGE SEARCH")
-    print("-" * 60)
-    print("Provider:\nGoogle Lens via SerpApi")
-    print(f"\nCandidates Found:\n{data['lens_candidates_found']}")
-
-    print("\nCANDIDATE VERIFICATION")
-    print("-" * 60)
-    print(f"Candidates Processed:\n{data['candidates_processed']}")
-    print(f"\nImages Downloaded:\n{data['candidate_images_downloaded']}")
-    print(f"\nCandidates With Faces:\n{data['candidates_with_faces']}")
-    print(f"\nFace Matches Verified (ArcFace):\n{data['verified_face_matches']}")
-
-    if best:
-        print("\nBEST MATCH")
-        print("-" * 60)
-        print(f"Title:\n{best.get('title')}")
-        print(f"\nSource:\n{best.get('source')}")
-        print(f"\nPage URL:\n{best.get('page_url')}")
-        print(f"\nImage URL:\n{best.get('image_url')}")
-        print(f"\nArcFace Distance:\n{best.get('face_distance')}")
-        print("\nFace Match:\n✓ FACE MATCH VERIFIED")
-
-    if bc:
-        print("\nBLOCKCHAIN")
-        print("-" * 60)
-        print(f"SHA-256:\n{bc.get('sha256')}")
-        print(f"\nContract:\n{bc.get('contract_address')}")
-        print(f"\nTransaction:\n{bc.get('transaction_hash')}")
-        print(f"\nBlock:\n{bc.get('block_number')}")
-        print("\nBlockchain Verification:\n✓ FINGERPRINT VERIFIED ON BLOCKCHAIN")
-
-    print("\n" + "=" * 60)
-    print("FINAL RESULT")
-    print("=" * 60)
-    print("FACE MATCH:\n✓ VERIFIED")
-    print("\nBLOCKCHAIN RECORD:\n✓ VERIFIED ON-CHAIN")
+    print("Input Face              : ✓ Detected")
+    print("Google Lens Search      : ✓ Completed")
+    print(f"Candidates Analyzed     : {summary['processed_candidates_count']}")
+    print(f"Face Matches Verified   : {summary['verified_matches_count']}")
+    print("Best Face Match         : ✓")
+    print("SHA-256 Fingerprint     : ✓ Generated")
+    print("Sepolia Registration    : ✓ Confirmed")
+    print("Blockchain Verification : ✓ TRUE")
+    print(f"\nEtherscan:\n{etherscan_url}")
     print("=" * 60 + "\n")
-    print("[+] Full structured pipeline output saved to 'final_result.json'\n")
+
+    return final_payload
 
 
 def main():
@@ -275,7 +264,7 @@ def main():
         description="HH Goa 2026 Task 3: Integrated End-to-End Pipeline CLI"
     )
     parser.add_argument(
-        "--image", "-i", required=True, help="Path to local input image file"
+        "--image", "-i", default=None, help="Path to local input image file"
     )
     parser.add_argument(
         "--top", "-t", type=int, default=10, help="Number of top candidates to process (default: 10)"
@@ -283,8 +272,31 @@ def main():
 
     args = parser.parse_args()
 
+    image_path = args.image
+
+    # If --image is omitted, enter Interactive Mode
+    if not image_path:
+        print("\n============================================================")
+        print("HH Goa 2026 — Face Identification & Blockchain Verification")
+        print("============================================================")
+        print("\nEnter path to face image:")
+        try:
+            user_input = input("> ")
+            image_path = user_input.strip().strip('"').strip("'")
+        except (KeyboardInterrupt, EOFError):
+            print("\n[-] Operation cancelled by user.")
+            sys.exit(0)
+
+        if not image_path:
+            print("[-] ERROR: No image path entered.", file=sys.stderr)
+            sys.exit(1)
+
+    if not os.path.exists(image_path):
+        print(f"[-] ERROR: Image file not found: '{image_path}'", file=sys.stderr)
+        sys.exit(1)
+
     try:
-        run_pipeline(image_path=args.image, top_n=args.top)
+        run_pipeline(image_path=image_path, top_n=args.top)
     except Exception as err:
         print(f"\n[-] ERROR: {err}", file=sys.stderr)
         sys.exit(1)

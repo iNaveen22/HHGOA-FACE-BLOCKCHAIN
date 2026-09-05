@@ -6,4 +6,5 @@ candidate_downloads/
 test_images/
 search_raw_response.json
 verification_summary.json
+final_result.json
 blockchain/contract_data.json
