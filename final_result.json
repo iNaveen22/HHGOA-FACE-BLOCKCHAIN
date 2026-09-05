@@ -1,0 +1,25 @@
+{
+  "input_image": "test_images/person1_a.jpg",
+  "lens_candidates_found": 59,
+  "candidates_processed": 10,
+  "candidate_images_downloaded": 10,
+  "candidates_with_faces": 10,
+  "verified_face_matches": 10,
+  "best_match": {
+    "title": "Zoid Kirsch on X: \"The story of how I came to own a copy of ...",
+    "source": "x.com",
+    "page_url": "https://x.com/ZoidCTF/status/1414325266298540040",
+    "image_url": "https://pbs.twimg.com/media/E6Cv6PCVIAM41zp.png",
+    "face_match": true,
+    "face_distance": 0.0167
+  },
+  "blockchain": {
+    "sha256": "7626db547c58e641fa20479c5e2c8a27127ec88b464a5e7b87dd119425038d2c",
+    "bytes32_hex": "0x7626db547c58e641fa20479c5e2c8a27127ec88b464a5e7b87dd119425038d2c",
+    "contract_address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+    "transaction_hash": "d333bbf7fd433fbec66937ae2f9e35fc81003a23b14730cb73199d4c187e1415",
+    "block_number": 6,
+    "verified": true
+  },
+  "status": "SUCCESS"
+}

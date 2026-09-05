@@ -1,94 +1,171 @@
-# HH Goa 2026 Shortlisting Task 3 - Milestone 4: Blockchain Storage & Verification
+# HH Goa 2026 Shortlisting Task 3 - Face Processing, Reverse Search & Blockchain Verification Pipeline
 
-This repository contains the complete implementation for **Milestone 4: Blockchain Fingerprint Storage & Verification**.
+This repository contains the complete, integrated implementation for **HH Goa 2026 Shortlisting Task 3** (Milestones 1 through 5).
 
 ---
 
-## 📌 Conceptual Architecture & Flow
+## 📌 Project Architecture
 
 ```text
 Local Input Image
        ↓
-DeepFace + ArcFace Processing (Milestone 1)
+[Milestone 1] DeepFace + ArcFace Face Detection & Feature Extraction
        ↓
-Google Lens Reverse Image Search via SerpApi (Milestone 2)
+[Milestone 2] Real Google Lens Reverse Image Search via SerpApi
        ↓
-Top Candidate Downloads & ArcFace Face Verification (Milestone 3)
+[Milestone 3] Top Candidate Image Download & ArcFace Face Verification
        ↓
-Canonical Verification Record Format (Milestone 4)
+[Milestone 3] Select Best VERIFIED Candidate Match (Lowest ArcFace Distance)
        ↓
-SHA-256 Fingerprint Generation (Milestone 4)
+[Milestone 4] Format Canonical Verification Record (json.dumps sort_keys=True)
        ↓
-Smart Contract (`VerificationRegistry.sol`) on Local Blockchain (Milestone 4)
+[Milestone 4] Calculate Deterministic SHA-256 Fingerprint
        ↓
-Transaction Receipt (Tx Hash & Block Number)
+[Milestone 4] Submit Fingerprint Transaction to Smart Contract (`VerificationRegistry.sol`)
        ↓
-Later Tamper Verification (Recalculate SHA-256 vs On-Chain State) -> VALID / TAMPERED
+[Milestone 4] On-Chain Fingerprint Re-Verification (`verifyRecord` -> TRUE)
+       ↓
+[Milestone 5] Final Structured Output (`final_result.json`) & Terminal CLI Summary
 ```
 
 ---
 
-## 📚 Key Concepts Explained (Beginner-Friendly)
+## 🚀 Key Features by Milestone
 
-### 1. Why use SHA-256?
-SHA-256 (Secure Hash Algorithm 256-bit) converts any arbitrary input data into a fixed 64-character hexadecimal fingerprint (256 bits). It is **one-way** and **deterministic**: the exact same input data will *always* produce the exact same 64-character fingerprint. Changing even a single character or number produces a completely different fingerprint.
+### 🔹 Milestone 1: Face Processing
+- Uses `DeepFace` with the **ArcFace** model (512-D embedding vector).
+- Detects bounding boxes and extracts faces using OpenCV detector backend.
+- Performs face verification using DeepFace's built-in threshold mechanism without hardcoding custom thresholds.
 
-### 2. Why DON'T we store images on-chain?
-Storing large binary files (like image files or large JSON blobs) directly on a blockchain is prohibitively expensive, slow, and bloats the blockchain ledger. Storing a 32-byte SHA-256 hash instead requires negligible gas and allows us to verify data integrity off-chain cleanly.
+### 🔹 Milestone 2: Genuine Reverse Image Search
+- Uploads local image to SerpApi's `/image` endpoint to obtain a temporary `image_id`.
+- Queries SerpApi's `google_lens` engine to retrieve live candidate web results.
+- Extracts structured metadata: `position`, `title`, `source` domain, `page_url`, `image_url`, `thumbnail_url`, `image_width`, and `image_height`.
 
-### 3. What does `bytes32` mean in Solidity?
-In Solidity, `bytes32` represents a fixed-size array of 32 raw bytes (256 bits). It is the native data type used to store a 256-bit SHA-256 hash on Ethereum efficiently.
+### 🔹 Milestone 3: Candidate Image Face Verification
+- Downloads candidate images from primary `image_url` (with fallback to `thumbnail_url`).
+- Handles network errors, timeouts, invalid images, and face-less candidates.
+- Evaluates candidate faces against the original input face using ArcFace.
+- Ranks candidate results so verified matches appear first (sorted by closest ArcFace distance).
 
-### 4. What is a Smart Contract?
-A Smart Contract (`VerificationRegistry.sol`) is an executable program that runs deterministically on the blockchain ledger. Once deployed, its functions (`storeRecord`, `verifyRecord`) execute according to strict code logic.
+### 🔹 Milestone 4: Blockchain Fingerprint Storage & Verification
+- Creates canonical JSON records (`json.dumps(..., sort_keys=True, separators=(',', ':'))`).
+- Computes SHA-256 hex digest and converts to `bytes32`.
+- Deploys Solidity smart contract (`VerificationRegistry.sol`, version `0.8.20`) to local Ethereum blockchain (Ganache).
+- Stores fingerprints on-chain with block timestamp.
+- Verifies fingerprint existence on-chain and detects data modifications (Tamper Test).
 
-### 5. What is an RPC Endpoint?
-An RPC (Remote Procedure Call) endpoint (e.g. `http://127.0.0.1:8545`) is the HTTP network interface that allows Python applications (`web3.py`) to communicate with an Ethereum node.
-
-### 6. What is a Blockchain Transaction & Transaction Hash?
-A transaction is a signed request sent to the blockchain to alter state (e.g., executing `storeRecord`). The **Transaction Hash** (e.g., `0x52475674...`) is the unique cryptographic identifier of that executed transaction.
-
-### 7. What the Blockchain Proves
-- **Data Integrity & Non-Repudiation**: Proves that a specific verification record fingerprint was created and recorded at a specific block timestamp.
-- **Tamper Detection**: Proves whether an off-chain verification record has been modified or altered after storage.
-
-### 8. What the Blockchain DOES NOT Prove (Limitations)
-- It does **NOT** prove that a social media post or profile is genuine or truthful.
-- It does **NOT** guarantee that the source website is trustworthy.
-- It does **NOT** imply that ArcFace face recognition is 100% infallible.
-- It only proves that **the exact verification result fingerprint was recorded on-chain at block timestamp $T$**.
+### 🔹 Milestone 5: Integrated End-to-End Pipeline
+- Connects Milestones 1–4 into a single CLI entry point (`main.py`).
+- Enforces strict input validation and safeguard checks (does not store unverified candidates on-chain).
+- Saves full structured output to `final_result.json`.
 
 ---
 
-## 🛠️ How to Run Milestone 4
+## 📥 Installation & Setup
 
-### 1. Start Local Blockchain Node (Ganache)
+### 1. Prerequisites
+- Python 3.11
+- Node.js & `npx` (for running Ganache local blockchain)
+
+### 2. Environment Variables Setup
+Copy `.env.example` to `.env` and add your SerpApi API key:
+```bash
+cp .env.example .env
+```
+Edit `.env`:
+```env
+SERPAPI_KEY=your_serpapi_api_key_here
+BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
+BLOCKCHAIN_PRIVATE_KEY=
+```
+
+### 3. Install Python Dependencies
+```bash
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+---
+
+## 🏃 How to Run the Pipeline
+
+### Step 1: Start Local Ganache Blockchain Server
+In a separate terminal, start Ganache on port 8545:
 ```bash
 npx ganache --port 8545 --deterministic
 ```
 
-### 2. Deploy Smart Contract (`VerificationRegistry.sol`)
+### Step 2: Deploy Smart Contract (`VerificationRegistry.sol`)
 ```bash
 .venv\Scripts\python.exe blockchain/deploy_local.py
 ```
 
-### 3. Run Standalone Blockchain & Tamper Verification Demo
+### Step 3: Run Main End-to-End Pipeline
 ```bash
-.venv\Scripts\python.exe blockchain/demo.py
-```
-
-### 4. Run Milestone 3 -> Milestone 4 Integration Test
-```bash
-.venv\Scripts\python.exe blockchain/integrate_m3.py
+.venv\Scripts\python.exe main.py --image test_images/person1_a.jpg --top 10
 ```
 
 ---
 
-## 🧪 Verification & Tamper Test Summary
+## 📊 Example CLI Terminal Output
 
-- **Contract Compilation**: Solidity `0.8.20` (`py-solc-x`)
-- **Contract Address**: `0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab`
-- **Original Record Fingerprint**: `ee850dc6dd9d4b9b1cc613ea54170470ebaa4e6aff194c02d88bffcc8cfeab09`
-- **On-Chain Verification (Original)**: `TRUE (VALID / VERIFIED)`
-- **Tampered Record (`face_distance: 0.5000`)**: `b4bf9cebc1042c5730507a6227c8ad228bbba40ed85981969c8a034a2a03948d`
-- **On-Chain Verification (Tampered)**: `FALSE (TAMPER DETECTED)`
+```text
+============================================================
+  HH GOA 2026 - FACE VERIFICATION & BLOCKCHAIN PIPELINE   
+============================================================
+
+[*] STEP 1: Validating input image and detecting faces...
+    - Input Image: test_images/person1_a.jpg
+    [+] Face Detection: SUCCESS (1 face(s) detected)
+
+[*] STEP 2: Executing Google Lens reverse image search (SerpApi)...
+    [+] Google Lens Search: CONNECTED
+    [+] Visual Matches Returned: 59
+
+[*] STEP 3: Downloading top 10 candidates & running ArcFace verification...
+    [+] VERIFIED BEST MATCH FOUND:
+        - Title         : Zoid Kirsch on X: "The story of how I came to own a copy of ...
+        - Source Domain : x.com
+        - Page URL      : https://x.com/ZoidCTF/status/1414325266298540040
+        - Image URL     : https://pbs.twimg.com/media/E6Cv6PCVIAM41zp.png
+        - ArcFace Dist  : 0.0167 (Threshold: 0.6800)
+        - Match Status  : ✓ FACE MATCH VERIFIED
+
+[*] STEP 5: Generating canonical record & SHA-256 fingerprint...
+    - Canonical Record : {"face_distance":0.0167,"face_match":true,"image_url":"https://pbs.twimg.com/media/E6Cv6PCVIAM41zp.png","source":"x.com","source_url":"https://x.com/ZoidCTF/status/1414325266298540040","title":"Zoid Kirsch on X: \"The story of how I came to own a copy of ..."}
+    - SHA-256 Fingerprint : 7626db547c58e641fa20479c5e2c8a27127ec88b464a5e7b87dd119425038d2c
+
+[*] STEP 6: Connecting to local blockchain & recording fingerprint...
+    [+] Blockchain: CONNECTED (http://127.0.0.1:8545)
+    [+] Contract Address: 0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab
+    [+] Transaction Hash : 531f54f5fca737d44c400296eddb8b1b48263652b0cdb157ff1c549b960fe0bb
+    [+] Block Number     : 5
+    [+] On-Chain Verification Status: True
+    [+] FINGERPRINT VERIFIED ON BLOCKCHAIN
+
+============================================================
+FINAL RESULT
+============================================================
+FACE MATCH:
+✓ VERIFIED
+
+BLOCKCHAIN RECORD:
+✓ VERIFIED ON-CHAIN
+============================================================
+```
+
+---
+
+## ⚠️ Important Limitations & Disclaimer
+
+> [!IMPORTANT]
+> - **Blockchain Scope**: The blockchain stores a 32-byte SHA-256 fingerprint of the verification evidence. It proves **data integrity and time of recording on-chain**.
+> - **Authenticity Disclaimer**: Recording a fingerprint on-chain does **NOT** prove that a web page or social media post is authentic, nor does it independently verify the real-world identity of a person.
+> - **Model Wording**: Matching candidates are reported strictly as `FACE MATCH VERIFIED` under the ArcFace model configuration, rather than claiming definitive identity resolution.
+> - **Benchmark Image Note**: Standard benchmark images (such as Lena) are used for technical pipeline validation.
+
+---
+
+## 🔒 Security Notes
+- Real API keys and private keys must **never** be committed to version control.
+- `.gitignore` is configured to exclude `.env`, `.venv/`, `candidate_downloads/`, `__pycache__/`, and temporary output files.

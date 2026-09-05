@@ -320,7 +320,7 @@ def main():
         print(f"  Processed Candidates Count            : {summary['processed_candidates_count']}")
         print(f"  Successfully Downloaded Images        : {summary['download_success_count']}")
         print(f"  Candidate Images Containing Faces     : {summary['images_with_faces_count']}")
-        print(f"  Verified Identity Matches (ArcFace)   : {summary['verified_matches_count']}")
+        print(f"  Face Matches Verified (ArcFace)   : {summary['verified_matches_count']}")
         print("=" * 70)
 
         best = summary["best_candidate"]

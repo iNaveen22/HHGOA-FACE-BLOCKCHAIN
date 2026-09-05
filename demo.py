@@ -64,7 +64,7 @@ def main():
             print(f"    - Preview (first 10 components): {embedding[:10]}")
 
         elif args.command == "verify":
-            print(f"[*] Verifying identity between:")
+            print(f"[*] Verifying face match between:")
             print(f"    - Image 1: {args.image}")
             print(f"    - Image 2: {args.compare}")
             result = face_processor.verify_faces(args.image, args.compare, enforce_detection=True)

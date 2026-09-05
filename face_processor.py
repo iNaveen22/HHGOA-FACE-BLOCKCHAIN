@@ -79,7 +79,7 @@ def generate_embedding(image_path: str, enforce_detection: bool = True):
 
 def verify_faces(img1_path: str, img2_path: str, enforce_detection: bool = True):
     """
-    Verifies whether two face images belong to the same identity.
+    Verifies whether two face images match visually using ArcFace.
 
     Uses DeepFace.verify with the ArcFace model. DeepFace automatically
     calculates distance (cosine distance by default for ArcFace) and applies the
