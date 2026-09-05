@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 .env
+candidate_downloads/
+test_images/
+search_raw_response.json
+verification_summary.json
+blockchain/contract_data.json
